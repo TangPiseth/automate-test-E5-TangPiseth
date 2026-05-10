@@ -99,6 +99,15 @@ public class ParkingFeeCalculator
             surcharge = baseFee * 0.50m;       // holiday takes priority
         else if (isWeekend)
             surcharge = baseFee * 0.20m;
+
+        decimal discountRate = membership switch
+        {
+            MembershipTier.Silver => 0.10m,
+            MembershipTier.Gold => 0.25m,
+            MembershipTier.Platinum => 0.40m,
+            _ => 0m
+        };
+        decimal discount = (baseFee + surcharge) * discountRate;
         //Overnight
         decimal overnightFee = 0m;
         if (checkOut.TimeOfDay >= new TimeSpan(22, 0, 0)     // check-out after 10 PM
@@ -106,7 +115,7 @@ public class ParkingFeeCalculator
         {
             overnightFee = 2_000m;
         }
-        decimal total = baseFee + surcharge + overnightFee;
+        decimal total = baseFee + surcharge - discount + overnightFee;
         return new ParkingFeeResult { TotalFee = total };
     }
 }
