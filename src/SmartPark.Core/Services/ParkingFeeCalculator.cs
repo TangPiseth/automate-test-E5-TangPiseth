@@ -52,28 +52,29 @@ public class ParkingFeeCalculator
     ///   8. Lost ticket: +20,000 KHR (not subject to discounts)
     ///   9. Total: baseFee + surcharge − discount + overnight + penalty (min 0)
     /// </remarks>
-    public ParkingFeeResult CalculateFee(VehicleType vehicleType, MembershipTier membership,
-    DateTime checkIn, DateTime checkOut, bool isLostTicket = false, bool isHoliday = false)
+    public ParkingFeeResult CalculateFee(
+    VehicleType vehicleType, MembershipTier membership,
+    DateTime checkIn, DateTime checkOut,
+    bool isLostTicket = false, bool isHoliday = false)
     {
-        // 1. Validation
-        if (checkOut < checkIn)
-            throw new ArgumentException("Check-out cannot be before check-in");
+        // Calculate duration
+        TimeSpan duration = checkOut - checkIn;
+        int totalMinutes = (int)duration.TotalMinutes;
 
-        var duration = checkOut - checkIn;
-
-        // 2. Grace period
-        if (duration.TotalMinutes <= 30)
-            return new ParkingFeeResult { TotalFee = 0m };
-
-        // 3. Billable hours
-        double billableMinutes = duration.TotalMinutes - 30;
-        int billableHours = (int)Math.Ceiling(billableMinutes / 60.0);
+        // Billable hours = ceil( (totalMinutes) / 60 )   -- no grace period yet
+        int billableHours = (int)Math.Ceiling(totalMinutes / 60.0);
         if (billableHours < 1) billableHours = 1;
 
-        // 4. Base fee (hardcoded motorcycle for now)
-        decimal hourlyRate = MotorcycleRatePerHour; // 500
-        decimal baseFee = billableHours * hourlyRate;
+        // Hourly rate by vehicle type
+        decimal hourlyRate = vehicleType switch
+        {
+            VehicleType.Motorcycle => 500m,
+            VehicleType.Car => 1_000m,
+            VehicleType.SUV => 1_500m,
+            _ => throw new ArgumentException("Unknown vehicle type")
+        };
 
+        decimal baseFee = billableHours * hourlyRate;
         return new ParkingFeeResult { TotalFee = baseFee };
     }
 }
