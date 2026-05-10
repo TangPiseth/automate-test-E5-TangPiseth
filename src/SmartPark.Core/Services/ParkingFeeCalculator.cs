@@ -91,12 +91,22 @@ public class ParkingFeeCalculator
         };
         if (baseFee > dailyCap)
             baseFee = dailyCap;
+        //Surcharge (weekend / holiday)
+        decimal surcharge = 0m;
+        bool isWeekend = checkIn.DayOfWeek == DayOfWeek.Saturday
+                         || checkIn.DayOfWeek == DayOfWeek.Sunday;
+        if (isHoliday)
+            surcharge = baseFee * 0.50m;       // holiday takes priority
+        else if (isWeekend)
+            surcharge = baseFee * 0.20m;
+        //Overnight
         decimal overnightFee = 0m;
         if (checkOut.TimeOfDay >= new TimeSpan(22, 0, 0)     // check-out after 10 PM
             || (checkOut.Date > checkIn.Date))                // or spans multiple days
         {
             overnightFee = 2_000m;
         }
-        return new ParkingFeeResult { TotalFee = baseFee + overnightFee };
+        decimal total = baseFee + surcharge + overnightFee;
+        return new ParkingFeeResult { TotalFee = total };
     }
 }
