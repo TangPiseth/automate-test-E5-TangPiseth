@@ -96,11 +96,28 @@ public class ParkingFeeCalculatorTests
     #endregion
 
     #region Holiday Surcharge
-    // Test holiday pricing and its interaction with weekend pricing
+    [Fact]
+    public void CalculateFee_Holiday_Adds50Percent()
+    {
+        var checkIn = new DateTime(2026, 3, 16, 10, 0, 0); // Monday
+        var checkOut = checkIn.AddHours(2);
+        var result = _calculator.CalculateFee(VehicleType.Car, MembershipTier.Guest, checkIn, checkOut, isHoliday: true);
+        Assert.Equal(3_000m, result.TotalFee); // 2000 + 1000
+    }
     #endregion
 
     #region Membership Discounts
-    // Test discount tiers and what amounts they apply to
+    [Theory]
+    [InlineData(MembershipTier.Silver, 1_800)]
+    [InlineData(MembershipTier.Gold, 1_500)]
+    [InlineData(MembershipTier.Platinum, 1_200)]
+    public void CalculateFee_Membership_DiscountApplied(MembershipTier tier, decimal expected)
+    {
+        var checkIn = new DateTime(2026, 3, 16, 10, 0, 0);
+        var checkOut = checkIn.AddHours(2);
+        var result = _calculator.CalculateFee(VehicleType.Car, tier, checkIn, checkOut);
+        Assert.Equal(expected, result.TotalFee);
+    }
     #endregion
 
     #region Lost Ticket
