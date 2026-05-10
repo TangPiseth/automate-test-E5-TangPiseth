@@ -58,66 +58,76 @@ public class ParkingFeeCalculator
     DateTime checkIn, DateTime checkOut,
     bool isLostTicket = false, bool isHoliday = false)
     {
-        // ---------- STEP 1: Validation ----------
+        // 1. Validation
         if (checkOut < checkIn)
             throw new ArgumentException("Check-out cannot be before check-in.");
 
-        // Calculate duration
-        TimeSpan duration = checkOut - checkIn;
+        var duration = checkOut - checkIn;
         int totalMinutes = (int)duration.TotalMinutes;
 
-        // Billable hours = ceil( (totalMinutes) / 60 )   -- no grace period yet
-        int billableHours = (int)Math.Ceiling(totalMinutes / 60.0);
+        // 2. Grace period – 0..30 min = free (lost ticket penalty still applies later)
+        if (totalMinutes <= 30)
+            return new ParkingFeeResult { TotalFee = 0m };
+
+        // 3. Billable hours = ceil((totalMinutes - 30) / 60), minimum 1
+        int billableMinutes = totalMinutes - 30;
+        int billableHours = (int)Math.Ceiling(billableMinutes / 60.0);
         if (billableHours < 1) billableHours = 1;
 
-        // Hourly rate by vehicle type
+        // 4. Base fee
         decimal hourlyRate = vehicleType switch
         {
-            VehicleType.Motorcycle => 500m,
-            VehicleType.Car => 1_000m,
-            VehicleType.SUV => 1_500m,
+            VehicleType.Motorcycle => MotorcycleRatePerHour,
+            VehicleType.Car => CarRatePerHour,
+            VehicleType.SUV => SuvRatePerHour,
             _ => throw new ArgumentException("Unknown vehicle type")
         };
-
-
         decimal baseFee = billableHours * hourlyRate;
+
         // Daily cap
         decimal dailyCap = vehicleType switch
         {
-            VehicleType.Motorcycle => 4_000m,
-            VehicleType.Car => 8_000m,
-            VehicleType.SUV => 12_000m,
+            VehicleType.Motorcycle => MotorcycleDailyCap,
+            VehicleType.Car => CarDailyCap,
+            VehicleType.SUV => SuvDailyCap,
             _ => throw new ArgumentException("Unknown vehicle type")
         };
-        if (baseFee > dailyCap)
-            baseFee = dailyCap;
-        //Surcharge (weekend / holiday)
+        if (baseFee > dailyCap) baseFee = dailyCap;
+
+        // 6. Surcharge (weekend / holiday) – holiday takes priority
         decimal surcharge = 0m;
         bool isWeekend = checkIn.DayOfWeek == DayOfWeek.Saturday
                          || checkIn.DayOfWeek == DayOfWeek.Sunday;
         if (isHoliday)
-            surcharge = baseFee * 0.50m;       // holiday takes priority
+            surcharge = baseFee * HolidaySurchargeRate;
         else if (isWeekend)
-            surcharge = baseFee * 0.20m;
+            surcharge = baseFee * WeekendSurchargeRate;
 
+        // 7. Membership discount (applies to baseFee + surcharge)
         decimal discountRate = membership switch
         {
-            MembershipTier.Silver => 0.10m,
-            MembershipTier.Gold => 0.25m,
-            MembershipTier.Platinum => 0.40m,
+            MembershipTier.Silver => SilverDiscountRate,
+            MembershipTier.Gold => GoldDiscountRate,
+            MembershipTier.Platinum => PlatinumDiscountRate,
             _ => 0m
         };
         decimal discount = (baseFee + surcharge) * discountRate;
-        decimal lostTicketFee = isLostTicket ? 20_000m : 0m;
-        //Overnight
+
+        // 5. Overnight fee (if session goes past 22:00 or spans midnight)
         decimal overnightFee = 0m;
-        if (checkOut.TimeOfDay >= new TimeSpan(22, 0, 0)     // check-out after 10 PM
-            || (checkOut.Date > checkIn.Date))                // or spans multiple days
+        if (checkOut.TimeOfDay >= new TimeSpan(OvernightHourThreshold, 0, 0)
+            || checkOut.Date > checkIn.Date)
         {
-            overnightFee = 2_000m;
+            overnightFee = OvernightFlatFee;
         }
-        
+
+        // 8. Lost ticket penalty (not subject to discounts)
+        decimal lostTicketFee = isLostTicket ? LostTicketPenalty : 0m;
+
+        // 9. Total
         decimal total = baseFee + surcharge - discount + overnightFee + lostTicketFee;
+        if (total < 0) total = 0;
+
         return new ParkingFeeResult { TotalFee = total };
     }
 }
