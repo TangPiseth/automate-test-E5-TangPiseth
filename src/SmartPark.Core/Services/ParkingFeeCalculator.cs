@@ -108,6 +108,7 @@ public class ParkingFeeCalculator
             _ => 0m
         };
         decimal discount = (baseFee + surcharge) * discountRate;
+        decimal lostTicketFee = isLostTicket ? 20_000m : 0m;
         //Overnight
         decimal overnightFee = 0m;
         if (checkOut.TimeOfDay >= new TimeSpan(22, 0, 0)     // check-out after 10 PM
@@ -115,7 +116,8 @@ public class ParkingFeeCalculator
         {
             overnightFee = 2_000m;
         }
-        decimal total = baseFee + surcharge - discount + overnightFee;
+        
+        decimal total = baseFee + surcharge - discount + overnightFee + lostTicketFee;
         return new ParkingFeeResult { TotalFee = total };
     }
 }
