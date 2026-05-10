@@ -65,7 +65,19 @@ public class ParkingFeeCalculatorTests
     #endregion
 
     #region Overnight Fee
-    // Test the flat fee applied for sessions that extend into late hours
+    [Fact]
+    public void CalculateFee_Overnight_Adds2000()
+    {
+        // Check-in 8 PM, check-out 11 PM (crosses 10 PM)
+        var checkIn = new DateTime(2026, 3, 16, 20, 0, 0);
+        var checkOut = new DateTime(2026, 3, 16, 23, 0, 0);
+
+        var result = _calculator.CalculateFee(VehicleType.Car, MembershipTier.Guest, checkIn, checkOut);
+
+        // Duration: 3 hours total, minus 30 min grace = 2.5h → ceil = 3 billable hours? Wait let's compute correctly:
+        // 3h = 180 min, minus grace 30 = 150 min → ceil(150/60) = 3 hours → 3000 base, +2000 overnight = 5000
+        Assert.Equal(5_000m, result.TotalFee);
+    }
     #endregion
 
     #region Weekend Surcharge
