@@ -1,5 +1,6 @@
 using SmartPark.Core.Models;
 
+
 namespace SmartPark.Core.Services;
 
 /// <summary>
@@ -57,6 +58,10 @@ public class ParkingFeeCalculator
     DateTime checkIn, DateTime checkOut,
     bool isLostTicket = false, bool isHoliday = false)
     {
+        // ---------- STEP 1: Validation ----------
+        if (checkOut < checkIn)
+            throw new ArgumentException("Check-out cannot be before check-in.");
+
         // Calculate duration
         TimeSpan duration = checkOut - checkIn;
         int totalMinutes = (int)duration.TotalMinutes;
