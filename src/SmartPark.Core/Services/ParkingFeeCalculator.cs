@@ -91,6 +91,12 @@ public class ParkingFeeCalculator
         };
         if (baseFee > dailyCap)
             baseFee = dailyCap;
-        return new ParkingFeeResult { TotalFee = baseFee };
+        decimal overnightFee = 0m;
+        if (checkOut.TimeOfDay >= new TimeSpan(22, 0, 0)     // check-out after 10 PM
+            || (checkOut.Date > checkIn.Date))                // or spans multiple days
+        {
+            overnightFee = 2_000m;
+        }
+        return new ParkingFeeResult { TotalFee = baseFee + overnightFee };
     }
 }
