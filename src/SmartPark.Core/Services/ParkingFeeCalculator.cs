@@ -79,7 +79,18 @@ public class ParkingFeeCalculator
             _ => throw new ArgumentException("Unknown vehicle type")
         };
 
+
         decimal baseFee = billableHours * hourlyRate;
+        // Daily cap
+        decimal dailyCap = vehicleType switch
+        {
+            VehicleType.Motorcycle => 4_000m,
+            VehicleType.Car => 8_000m,
+            VehicleType.SUV => 12_000m,
+            _ => throw new ArgumentException("Unknown vehicle type")
+        };
+        if (baseFee > dailyCap)
+            baseFee = dailyCap;
         return new ParkingFeeResult { TotalFee = baseFee };
     }
 }
