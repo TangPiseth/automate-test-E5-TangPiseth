@@ -52,17 +52,28 @@ public class ParkingFeeCalculator
     ///   8. Lost ticket: +20,000 KHR (not subject to discounts)
     ///   9. Total: baseFee + surcharge − discount + overnight + penalty (min 0)
     /// </remarks>
-    public ParkingFeeResult CalculateFee(
-        VehicleType vehicleType,
-        MembershipTier membership,
-        DateTime checkIn,
-        DateTime checkOut,
-        bool isLostTicket = false,
-        bool isHoliday = false)
+    public ParkingFeeResult CalculateFee(VehicleType vehicleType, MembershipTier membership,
+    DateTime checkIn, DateTime checkOut, bool isLostTicket = false, bool isHoliday = false)
     {
-        // TODO: Implement the 9-step fee calculation using TDD.
-        // Write a failing test first (RED), then implement just enough to pass (GREEN).
-        throw new NotImplementedException(
-            "Implement this method using TDD — see the assignment spec for the 9-step calculation flow.");
+        // 1. Validation
+        if (checkOut < checkIn)
+            throw new ArgumentException("Check-out cannot be before check-in");
+
+        var duration = checkOut - checkIn;
+
+        // 2. Grace period
+        if (duration.TotalMinutes <= 30)
+            return new ParkingFeeResult { TotalFee = 0m };
+
+        // 3. Billable hours
+        double billableMinutes = duration.TotalMinutes - 30;
+        int billableHours = (int)Math.Ceiling(billableMinutes / 60.0);
+        if (billableHours < 1) billableHours = 1;
+
+        // 4. Base fee (hardcoded motorcycle for now)
+        decimal hourlyRate = MotorcycleRatePerHour; // 500
+        decimal baseFee = billableHours * hourlyRate;
+
+        return new ParkingFeeResult { TotalFee = baseFee };
     }
 }
