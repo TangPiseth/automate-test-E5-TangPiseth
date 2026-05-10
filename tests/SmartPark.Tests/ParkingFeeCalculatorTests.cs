@@ -121,7 +121,15 @@ public class ParkingFeeCalculatorTests
     #endregion
 
     #region Lost Ticket
-    // Test the penalty and how it interacts with other fee modifiers
+    [Fact]
+    public void CalculateFee_LostTicket_Adds20000_NoDiscount()
+    {
+        var checkIn = new DateTime(2026, 3, 16, 10, 0, 0);
+        var checkOut = checkIn.AddHours(2);
+        var result = _calculator.CalculateFee(VehicleType.Car, MembershipTier.Gold, checkIn, checkOut, isLostTicket: true);
+        // base 2000, no surcharge, Gold discount = 25% of 2000 = 500, discounted total 1500, +20000 = 21500
+        Assert.Equal(21_500m, result.TotalFee);
+    }
     #endregion
 
     #region Edge Cases
