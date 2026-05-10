@@ -76,7 +76,15 @@ public class ParkingFeeCalculatorTests
     #endregion
 
     #region Edge Cases
-    // Test invalid inputs and boundary conditions
+    [Fact]
+    public void CalculateFee_CheckOutBeforeCheckIn_ThrowsArgumentException()
+    {
+        var checkIn = new DateTime(2026, 3, 16, 12, 0, 0);
+        var checkOut = checkIn.AddHours(-1);  // before checkin
+
+        Assert.Throws<ArgumentException>(() =>
+            _calculator.CalculateFee(VehicleType.Car, MembershipTier.Guest, checkIn, checkOut));
+    }
     #endregion
 
     #region Property-Based Tests
