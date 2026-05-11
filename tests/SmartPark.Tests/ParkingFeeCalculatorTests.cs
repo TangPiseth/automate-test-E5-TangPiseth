@@ -145,7 +145,93 @@ public class ParkingFeeCalculatorTests
     #endregion
 
     #region Property-Based Tests
-    // Write at least 5 FsCheck properties that must hold for ALL valid inputs
-    // You may need custom Arbitrary<T> for generating valid DateTime pairs
+
+    private static Arbitrary<(DateTime checkIn, DateTime checkOut)> ValidParkingDateTime()
+    {
+        var gen = from checkIn in Arb.Generate<DateTime>()
+                      .Where(d => d.Year >= 2024 && d.Year <= 2026)
+                  from hours in Gen.Choose(0, 48)
+                  let checkOut = checkIn.AddHours(hours)
+                  where checkOut >= checkIn
+                  select (checkIn, checkOut);
+        return gen.ToArbitrary();
+    }
+
+    [Property]
+    public Property FeeIsNeverNegative()
+    {
+        return Prop.ForAll(ValidParkingDateTime(), t =>
+        {
+            var result = _calculator.CalculateFee(VehicleType.Car, MembershipTier.Guest,
+                t.checkIn, t.checkOut);
+            return result.TotalFee >= 0;
+        });
+    }
+
+    [Property]
+    public Property GracePeriodIsAlwaysFree()
+    {
+        var gen = from checkIn in Arb.Generate<DateTime>()
+                  from min in Gen.Choose(0, 30)
+                  let checkOut = checkIn.AddMinutes(min)
+                  select (checkIn, checkOut);
+        return Prop.ForAll(gen.ToArbitrary(), t =>
+        {
+            var result = _calculator.CalculateFee(VehicleType.Car, MembershipTier.Guest,
+                t.checkIn, t.checkOut);
+            return result.TotalFee == 0;
+        });
+    }
+
+    [Property]
+    public Property LongerStaysCostMoreOrEqual()
+    {
+        var gen = from checkIn in Arb.Generate<DateTime>().Where(d => d.Year == 2026)
+                  from h1 in Gen.Choose(1, 23)
+                  from h2 in Gen.Choose(1, 23)
+                  where h1 < h2
+                  let out1 = checkIn.AddHours(h1)
+                  let out2 = checkIn.AddHours(h2)
+                  select (checkIn, out1, out2);
+        return Prop.ForAll(gen.ToArbitrary(), t =>
+        {
+            var fee1 = _calculator.CalculateFee(VehicleType.Car, MembershipTier.Guest,
+                t.checkIn, t.out1).TotalFee;
+            var fee2 = _calculator.CalculateFee(VehicleType.Car, MembershipTier.Guest,
+                t.checkIn, t.out2).TotalFee;
+            return fee1 <= fee2;
+        });
+    }
+
+    [Property]
+    public Property MembersPayLessThanOrEqualToGuests()
+    {
+        return Prop.ForAll(ValidParkingDateTime(), t =>
+        {
+            var guestFee = _calculator.CalculateFee(VehicleType.Car, MembershipTier.Guest,
+                t.checkIn, t.checkOut).TotalFee;
+            var silverFee = _calculator.CalculateFee(VehicleType.Car, MembershipTier.Silver,
+                t.checkIn, t.checkOut).TotalFee;
+            var goldFee = _calculator.CalculateFee(VehicleType.Car, MembershipTier.Gold,
+                t.checkIn, t.checkOut).TotalFee;
+            var platinumFee = _calculator.CalculateFee(VehicleType.Car, MembershipTier.Platinum,
+                t.checkIn, t.checkOut).TotalFee;
+            return silverFee <= guestFee && goldFee <= guestFee && platinumFee <= guestFee;
+        });
+    }
+
+    [Property]
+    public Property LostTicketAddsExactly20000()
+    {
+        return Prop.ForAll(ValidParkingDateTime(), t =>
+        {
+            var feeLost = _calculator.CalculateFee(VehicleType.Car, MembershipTier.Guest,
+                t.checkIn, t.checkOut, isLostTicket: true).TotalFee;
+            var feeNormal = _calculator.CalculateFee(VehicleType.Car, MembershipTier.Guest,
+                t.checkIn, t.checkOut).TotalFee;
+            return feeLost - feeNormal == 20_000m;
+        });
+    }
+
     #endregion
 }
