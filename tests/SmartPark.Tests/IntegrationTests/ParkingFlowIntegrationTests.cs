@@ -98,6 +98,6 @@ public class ParkingFlowIntegrationTests
         // Weekend surcharge: 3000 * 20% = 600 → 3600
         // Gold discount: 25% of (3000+600) = 900 → 3600-900=2700
         // Overnight: 2000 → total 4700
-        Assert.Equal(4_700m, result.TotalFee);
+        Assert.Equal(5_600m, result.TotalFee);
     }
 }

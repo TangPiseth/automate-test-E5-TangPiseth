@@ -26,7 +26,6 @@ public class ParkingSessionManagerTests
             _dateTimeStub.Object);
     }
 
-    // Example test (kept but not counted in our minimum)
     [Fact]
     public async Task CheckInAsync_NewVehicle_LookUpMembership()
     {
@@ -40,8 +39,6 @@ public class ParkingSessionManagerTests
         Assert.Equal("PP-9999", ticket.Vehicle.LicensePlate);
     }
 
-    #region Added test double scenarios (5 total)
-
     [Fact]
     public async Task CheckInAsync_Success_SavesTicket()
     {
@@ -52,7 +49,7 @@ public class ParkingSessionManagerTests
         var ticket = await _manager.CheckInAsync("PP-123", VehicleType.Car);
 
         _repoStub.Verify(r => r.SaveTicketAsync(It.IsAny<ParkingTicket>()), Times.Once);
-        Assert.False(ticket.CheckOutTime.HasValue); // still active
+        Assert.False(ticket.CheckOutTime.HasValue);
     }
 
     [Fact]
@@ -94,6 +91,7 @@ public class ParkingSessionManagerTests
         };
         _repoStub.Setup(r => r.GetTicketByIdAsync(ticket.TicketId)).ReturnsAsync(ticket);
         _paymentStub.Setup(p => p.ProcessPaymentAsync(It.IsAny<string>(), It.IsAny<decimal>())).ReturnsAsync(false);
+        _dateTimeStub.Setup(d => d.Now).Returns(new DateTime(2026, 3, 16, 11, 0, 0));   // FIXED: add time
 
         await Assert.ThrowsAsync<Exception>(() => _manager.CheckOutAsync(ticket.TicketId, "012345678"));
         _repoStub.Verify(r => r.UpdateTicketAsync(It.IsAny<ParkingTicket>()), Times.Never);
@@ -112,12 +110,11 @@ public class ParkingSessionManagerTests
         _paymentStub.Setup(p => p.ProcessPaymentAsync(It.IsAny<string>(), It.IsAny<decimal>())).ReturnsAsync(true);
         _notificationStub.Setup(n => n.SendReceiptAsync(It.IsAny<string>(), It.IsAny<string>()))
                          .ThrowsAsync(new Exception("SMS error"));
+        _dateTimeStub.Setup(d => d.Now).Returns(new DateTime(2026, 3, 16, 11, 0, 0));   // FIXED: add time
 
         var result = await _manager.CheckOutAsync(ticket.TicketId, "012345678");
 
         _repoStub.Verify(r => r.UpdateTicketAsync(It.IsAny<ParkingTicket>()), Times.Once);
         Assert.NotNull(result);
     }
-
-    #endregion
 }
