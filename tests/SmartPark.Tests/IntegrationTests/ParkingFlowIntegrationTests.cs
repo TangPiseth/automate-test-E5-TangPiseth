@@ -7,29 +7,11 @@ namespace SmartPark.Tests.IntegrationTests;
 
 public class ParkingFlowIntegrationTests
 {
-    // ────────────────────────────────────────────────────────────
-    //  INTEGRATION TEST SETUP
-    //  Uses REAL components for business logic, and TEST DOUBLES
-    //  only for external boundaries:
-    //
-    //  Real objects:
-    //    ParkingFeeCalculator       — real (pure logic, no side effects)
-    //    InMemoryParkingRepository  — fake (working in-memory implementation)
-    //
-    //  Test doubles (via Moq, used as stubs here):
-    //    IPaymentGateway            — stub (always returns success)
-    //    INotificationService       — stub (does nothing)
-    //    IDateTimeProvider          — stub (returns controlled time)
-    //    IMembershipService         — stub (returns Guest for all)
-    // ────────────────────────────────────────────────────────────
-
     private readonly ParkingFeeCalculator _feeCalculator = new();
-    private readonly InMemoryParkingRepository _repository = new();  // fake
+    private readonly InMemoryParkingRepository _repository = new();
     private readonly Mock<IPaymentGateway> _paymentStub = new();
     private readonly Mock<INotificationService> _notificationStub = new();
     private readonly ParkingSessionManager _manager;
-
-    // Fake clock — set this in each test to control time
     private DateTime _currentTime = new(2026, 3, 16, 10, 0, 0); // Monday 10 AM
 
     public ParkingFlowIntegrationTests()
@@ -48,43 +30,74 @@ public class ParkingFlowIntegrationTests
             _paymentStub.Object,
             _notificationStub.Object,
             membershipStub.Object,
-            _repository,          // real fake, not a Moq object
+            _repository,
             dateTimeStub.Object);
     }
 
-    // ────────────────────────────────────────────────────────────
-    //  EXAMPLE TEST — shows how to advance time between operations.
-    //  Delete or keep this; it does not count toward your grade.
-    // ────────────────────────────────────────────────────────────
-
+    // 1. Existing test (keep)
     [Fact]
     public async Task FullFlow_CheckInAndCheckOut_CalculatesCorrectFee()
     {
-        // Arrange — check in at 10:00 AM
-        _currentTime = new DateTime(2026, 3, 16, 10, 0, 0); // Monday
+        _currentTime = new DateTime(2026, 3, 16, 10, 0, 0);
         var ticket = await _manager.CheckInAsync("TEST-001", VehicleType.Car);
-
-        // Act — check out at 12:30 PM (2.5 hours later → 2 billable hours after grace)
         _currentTime = new DateTime(2026, 3, 16, 12, 30, 0);
         var result = await _manager.CheckOutAsync(ticket.TicketId, "012-345-678");
-
-        // Assert — Car: 2 hours × 1,000 = 2,000 KHR
         Assert.Equal(2_000m, result.TotalFee);
     }
 
-    #region Full Parking Flow
-    // End-to-end scenarios from check-in through check-out
-    #endregion
+    // 2. Grace period free
+    [Fact]
+    public async Task GracePeriod_CheckOutWithin30Min_ReturnsFree()
+    {
+        _currentTime = new DateTime(2026, 3, 16, 10, 0, 0);
+        var ticket = await _manager.CheckInAsync("GRACE-01", VehicleType.Car);
+        _currentTime = new DateTime(2026, 3, 16, 10, 20, 0); // 20 min later
+        var result = await _manager.CheckOutAsync(ticket.TicketId, "012-345-678");
+        Assert.Equal(0m, result.TotalFee);
+    }
 
-    #region Multiple Vehicles
-    // Test concurrent parking sessions and their lifecycle
-    #endregion
+    // 3. Multiple vehicles
+    [Fact]
+    public async Task MultipleVehicles_CheckOutOne_LeaveOthersActive()
+    {
+        _currentTime = new DateTime(2026, 3, 16, 10, 0, 0);
+        var ticket1 = await _manager.CheckInAsync("CAR-1", VehicleType.Car);
+        var ticket2 = await _manager.CheckInAsync("CAR-2", VehicleType.Car);
+        var ticket3 = await _manager.CheckInAsync("CAR-3", VehicleType.Car);
 
-    #region Error Recovery
-    // Test system state consistency after error conditions
-    #endregion
+        _currentTime = new DateTime(2026, 3, 16, 11, 0, 0);
+        await _manager.CheckOutAsync(ticket2.TicketId, "012-345-678");
 
-    #region Edge-to-Edge Scenarios
-    // Test complex combinations of fee modifiers working together
-    #endregion
+        var active = await _repository.GetAllActiveTicketsAsync();
+        Assert.Equal(2, active.Count());
+    }
+
+    // 4. Duplicate check-in rejected
+    [Fact]
+    public async Task DuplicateCheckIn_ThrowsException()
+    {
+        _currentTime = new DateTime(2026, 3, 16, 10, 0, 0);
+        await _manager.CheckInAsync("DUP-01", VehicleType.Car);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _manager.CheckInAsync("DUP-01", VehicleType.Car));
+    }
+
+    // 5. Overnight + weekend + Gold member
+    [Fact]
+    public async Task OvernightWeekendGold_CalculatesCorrectly()
+    {
+        // Saturday 21:00 - Sunday 01:00 (4h total, overnight, weekend surcharge, Gold discount)
+        _currentTime = new DateTime(2026, 3, 14, 21, 0, 0); // Saturday
+        var ticket = await _manager.CheckInAsync("GOLD-01", VehicleType.Car);
+        // Override membership to Gold
+        ticket.Vehicle.Membership = MembershipTier.Gold;
+
+        _currentTime = new DateTime(2026, 3, 15, 1, 0, 0); // Sunday 1 AM
+        var result = await _manager.CheckOutAsync(ticket.TicketId, "012-345-678");
+
+        // Calculation: 4h total → 180 min after grace = 2.5h → ceil = 3h * 1000 = 3000, capped? no
+        // Weekend surcharge: 3000 * 20% = 600 → 3600
+        // Gold discount: 25% of (3000+600) = 900 → 3600-900=2700
+        // Overnight: 2000 → total 4700
+        Assert.Equal(4_700m, result.TotalFee);
+    }
 }
