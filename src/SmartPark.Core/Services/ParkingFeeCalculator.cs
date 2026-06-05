@@ -47,22 +47,10 @@ public class ParkingFeeCalculator
         int billableHours = (int)Math.Ceiling(billableMinutes / 60.0);
         if (billableHours < 1) billableHours = 1;
 
-        decimal hourlyRate = vehicleType switch
-        {
-            VehicleType.Motorcycle => MotorcycleRatePerHour,
-            VehicleType.Car => CarRatePerHour,
-            VehicleType.SUV => SuvRatePerHour,
-            _ => throw new ArgumentException("Unknown vehicle type")
-        };
+        decimal hourlyRate = GetHourlyRate(vehicleType);
         decimal baseFee = billableHours * hourlyRate;
 
-        decimal dailyCap = vehicleType switch
-        {
-            VehicleType.Motorcycle => MotorcycleDailyCap,
-            VehicleType.Car => CarDailyCap,
-            VehicleType.SUV => SuvDailyCap,
-            _ => throw new ArgumentException("Unknown vehicle type")
-        };
+        decimal dailyCap = GetDailyCap(vehicleType);
         if (baseFee > dailyCap) baseFee = dailyCap;
 
         decimal surcharge = 0m;
@@ -96,4 +84,20 @@ public class ParkingFeeCalculator
 
         return new ParkingFeeResult { TotalFee = total };
     }
+
+    private static decimal GetHourlyRate(VehicleType vehicleType) => vehicleType switch
+    {
+        VehicleType.Motorcycle => MotorcycleRatePerHour,
+        VehicleType.Car => CarRatePerHour,
+        VehicleType.SUV => SuvRatePerHour,
+        _ => throw new ArgumentException("Unknown vehicle type")
+    };
+
+    private static decimal GetDailyCap(VehicleType vehicleType) => vehicleType switch
+    {
+        VehicleType.Motorcycle => MotorcycleDailyCap,
+        VehicleType.Car => CarDailyCap,
+        VehicleType.SUV => SuvDailyCap,
+        _ => throw new ArgumentException("Unknown vehicle type")
+    };
 }
